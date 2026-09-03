@@ -66,7 +66,7 @@
         .odds-row { display: grid; gap: 10px; margin-bottom: 10px; }
         .grid-3 { grid-template-columns: repeat(3, 1fr); }
         .grid-2 { grid-template-columns: repeat(2, 1fr); }
-        .grid-uo { grid-template-columns: 80px 1fr 1fr; } /* Layout speciale per Under/Over */
+        .grid-uo { grid-template-columns: 80px 1fr 1fr; } 
 
         .odd-box {
             background: var(--bg-box);
@@ -306,32 +306,41 @@
             document.getElementById('tot-mult').textContent = count > 0 ? total.toFixed(2) : "1.00";
         }
 
-        // CHIAMATA API E CALCOLO MATEMATICO DOPPIE CHANCE
+        // CHIAMATA API E CALCOLO MATEMATICO DOPPIE CHANCE (Senza btts)
         async function fetchAPI(id) {
             let h = document.getElementById(`m${id}-home`).value.trim().toLowerCase();
             let a = document.getElementById(`m${id}-away`).value.trim().toLowerCase();
             let lKey = document.getElementById(`m${id}-league`).value;
             let btn = document.getElementById(`btn-api-${id}`);
 
-            if(!h || !a) { alert("Inserisci le squadre prima di estrapolare le quote."); return; }
+            if(!h || !a) { alert("⚠️ Inserisci le squadre prima di estrapolare le quote."); return; }
 
             btn.textContent = "⏳ Cerco..."; btn.style.background = "var(--gold-accent)"; btn.style.color = "#000";
 
             try {
-                const url = `https://api.the-odds-api.com/v4/sports/${lKey}/odds/?apiKey=${API_KEY}&regions=eu&markets=h2h,totals,btts`;
+                // RIMOSSO "btts" DALLA CHIAMATA PER EVITARE IL BLOCCO DEL SERVER
+                const url = `https://api.the-odds-api.com/v4/sports/${lKey}/odds/?apiKey=${API_KEY}&regions=eu&markets=h2h,totals`;
                 const response = await fetch(url);
-                if (!response.ok) throw new Error("API Error");
+                
+                if (!response.ok) {
+                    console.error("Errore HTTP:", response.status);
+                    throw new Error("API bloccata o crediti esauriti");
+                }
+                
                 const data = await response.json();
                 
                 let matchData = null;
                 for (let match of data) {
                     let apiH = match.home_team.toLowerCase(); let apiA = match.away_team.toLowerCase();
-                    if (apiH.includes(h) || h.includes(apiH) || apiA.includes(a) || a.includes(apiA)) { matchData = match; break; }
+                    if (apiH.includes(h) || h.includes(apiH) || apiA.includes(a) || a.includes(apiA)) { 
+                        matchData = match; 
+                        break; 
+                    }
                 }
 
                 if (!matchData || !matchData.bookmakers || matchData.bookmakers.length === 0) {
-                    alert("Match non trovato sul database europeo. Inserisci le quote a mano.");
-                    throw new Error("Not found");
+                    alert("❌ Match non trovato sul database. Controlla i nomi o inserisci le quote a mano.");
+                    throw new Error("Match Not Found");
                 }
 
                 // Prendiamo il primo bookmaker disponibile per fare la media veloce
@@ -353,17 +362,10 @@
                             if(out.point === 2.5 && out.name.toLowerCase() === 'under') document.getElementById(`val-${id}-u`).value = out.price.toFixed(2);
                         });
                     }
-                    if(mkt.key === 'btts') {
-                        mkt.outcomes.forEach(out => {
-                            if(out.name.toLowerCase() === 'yes') document.getElementById(`val-${id}-g`).value = out.price.toFixed(2);
-                            if(out.name.toLowerCase() === 'no') document.getElementById(`val-${id}-ng`).value = out.price.toFixed(2);
-                        });
-                    }
                 });
 
                 // MATEMATICA: Calcolo Automatico Doppie Chance partendo da 1X2
                 if(o1 > 0 && ox > 0 && o2 > 0) {
-                    // Formula approssimata DC compensata col margine bookie (moltiplicatore x1.05 per bilanciare l'aggio)
                     let p1 = 1/o1; let px = 1/ox; let p2 = 1/o2;
                     let d1x = (1 / (p1 + px)) * 0.95;
                     let d12 = (1 / (p1 + p2)) * 0.95;
@@ -378,6 +380,7 @@
                 calcTotal(); // Aggiorna se c'erano selezioni attive
 
             } catch (e) {
+                console.error(e);
                 btn.textContent = "⚠️ Fallito"; btn.style.background = "var(--red-value)"; btn.style.color = "#fff";
             }
             
