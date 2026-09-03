@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SUPERMOLTIPLICATORE | BetBar</title>
+    
+    <style>
+        :root {
+            --bg-base: #11141a;
+            --bg-card: #181d26;
+            --bg-box: #232c3b;
+            --bg-box-hover: #2c3749;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+        }
+
+        * { box-sizing: border-box; }
+        
+        body { 
+            margin: 0; padding: 0; width: 100vw; min-height: 100vh; 
+            background-color: var(--bg-base);
+            color: var(--text-main); 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            padding-bottom: 100px; /* Spazio per la barra fluttuante */
+        }
+
+        /* HEADER */
+        .top-nav {
+            display: flex; justify-content: space-between; align-items: center; 
+            height: 60px; background: #0b0d12; border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 0 20px; position: sticky; top: 0; z-index: 100;
+        }
+        .logo { font-size: 1.5rem; font-weight: 900; color: #fff; letter-spacing: 1px; font-style: italic;}
+        .logo span { color: var(--accent-blue); }
+        .nav-tools { display: flex; gap: 15px; align-items: center; }
+        .match-selector { background: var(--bg-box); color: #fff; border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 6px; font-weight: bold; outline: none; cursor: pointer;}
+        
+        /* CONTAINER PRINCIPALE */
+        .container { max-width: 800px; margin: 0 auto; padding: 20px 15px; }
+
+        /* CARD PARTITA */
+        .match-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.02);
+            display: none; /* Gestito via JS */
+        }
+
+        .match-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;}
+        .team-inputs { display: flex; flex-direction: column; gap: 8px; flex-grow: 1; margin-right: 15px;}
+        .team-input { background: transparent; border: none; color: #fff; font-size: 1.2rem; font-weight: bold; outline: none; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; width: 100%;}
+        .team-input:focus { border-bottom-color: var(--accent-blue); }
+        
+        .api-controls { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; width: 150px;}
+        .league-sel { background: var(--bg-box); border: none; color: var(--text-muted); font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; width: 100%; outline:none;}
+        .btn-api { background: var(--accent-blue); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; width: 100%; transition: 0.2s;}
+        .btn-api:hover { filter: brightness(1.2); }
+
+        /* GRIGLIA QUOTE E-PLAY24 STYLE */
+        .odds-row { display: grid; gap: 10px; margin-bottom: 10px; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-uo { grid-template-columns: 80px 1fr 1fr; } /* Layout speciale per Under/Over */
+
+        .odd-box {
+            background: var(--bg-box);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 8px 5px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s; user-select: none;
+        }
+        .odd-box:hover { background: var(--bg-box-hover); }
+        .odd-box.selected { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.1); }
+        
+        .odd-lbl { font-size: 0.75rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 4px; pointer-events: none;}
+        .odd-val { background: transparent; border: none; color: #fff; font-size: 1.1rem; font-weight: bold; text-align: center; width: 100%; outline: none; cursor: text;}
+        .odd-val:focus { color: var(--accent-green); }
+
+        .static-lbl { display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-weight: bold; color: var(--text-muted); font-size: 0.9rem;}
+
+        /* FLOATING BOTTOM BAR */
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: #0b0d12; border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5); z-index: 100;
+        }
+        .bb-info { display: flex; flex-direction: column; }
+        .bb-lbl { font-size: 0.8rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 4px;}
+        .bb-val { font-size: 2rem; font-weight: 900; color: var(--accent-green); line-height: 1;}
+        .bb-val span { font-size: 1.2rem; color: #fff; }
+        
+        .btn-schedina { background: var(--accent-green); color: #000; border: none; padding: 12px 25px; border-radius: 8px; font-weight: 900; font-size: 1.1rem; text-transform: uppercase; cursor: pointer; transition: 0.2s;}
+        .btn-schedina:hover { transform: scale(1.05); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+
+        /* SCHERMATA SCHEDINA (MODAL) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: var(--bg-base); z-index: 2000; display: none;
+            overflow-y: auto; padding: 40px 20px;
+        }
+        .slip-container { max-width: 500px; margin: 0 auto; background: var(--bg-card); border-radius: 16px; padding: 30px; box-shadow: 0 0 50px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); }
+        .slip-header { text-align: center; margin-bottom: 30px; border-bottom: 2px dashed rgba(255,255,255,0.1); padding-bottom: 20px;}
+        .slip-logo { font-size: 2rem; font-weight: 900; color: #fff; font-style: italic; margin-bottom: 5px;}
+        .slip-logo span { color: var(--accent-blue); }
+        
+        .slip-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 15px 0;}
+        .slip-item:last-child { border-bottom: none; }
+        .slip-match { font-weight: bold; font-size: 1.1rem; color: #fff; display:block; margin-bottom: 4px;}
+        .slip-market { font-size: 0.85rem; color: var(--text-muted); background: var(--bg-box); padding: 2px 6px; border-radius: 4px;}
+        .slip-odd { font-weight: 900; font-size: 1.4rem; color: var(--accent-green); }
+
+        .slip-footer { margin-top: 20px; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 12px; padding: 20px; text-align: center;}
+        .slip-total-lbl { font-size: 0.9rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 5px;}
+        .slip-total-val { font-size: 3rem; font-weight: 900; color: var(--accent-green); line-height: 1;}
+        
+        .btn-close-modal { display: block; width: 100%; background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 20px; cursor: pointer; text-transform: uppercase;}
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <div class="logo">SUPER<span>MOLTIPLICATORE</span></div>
+        <div class="nav-tools">
+            <select class="match-selector" id="match-count" onchange="renderMatches()">
+                <option value="1">1 Match</option>
+                <option value="2">2 Match</option>
+                <option value="3" selected>3 Match</option>
+                <option value="4">4 Match</option>
+                <option value="5">5 Match</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="container" id="matches-container">
+        <!-- Generato via JS -->
+    </div>
+
+    <div class="bottom-bar">
+        <div class="bb-info">
+            <div class="bb-lbl">Eventi: <span id="tot-count" style="color:#fff;">0</span></div>
+            <div class="bb-val"><span>@</span> <span id="tot-mult">1.00</span></div>
+        </div>
+        <button class="btn-schedina" onclick="generateSlip()">📸 Crea Schedina</button>
+    </div>
+
+    <!-- MODAL SCHEDINA FINALE -->
+    <div class="modal-overlay" id="slip-modal">
+        <div class="slip-container">
+            <div class="slip-header">
+                <div class="slip-logo">SUPER<span>MOLTIPLICATORE</span></div>
+                <div style="color:var(--text-muted); font-size:0.8rem;" id="slip-date"></div>
+            </div>
+            
+            <div id="slip-list"></div>
+            
+            <div class="slip-footer">
+                <div class="slip-total-lbl">Quota Totale</div>
+                <div class="slip-total-val" id="slip-final-mult">@ 1.00</div>
+            </div>
+            
+            <button class="btn-close-modal" onclick="closeSlip()">← Torna all'Editor</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = "ebb57f70617f6f4bb3f531b20685b755"; 
+        let matchState = {};
+
+        function renderMatches() {
+            const count = parseInt(document.getElementById('match-count').value);
+            const container = document.getElementById('matches-container');
+            let html = '';
+
+            for(let i=1; i<=5; i++) {
+                if(!matchState[i]) matchState[i] = { selectedMarket: null };
+                
+                let displayStyle = i <= count ? 'block' : 'none';
+                
+                html += `
+                <div class="match-card" id="card-${i}" style="display: ${displayStyle};">
+                    <div class="match-header">
+                        <div class="team-inputs">
+                            <input type="text" class="team-input" id="m${i}-home" placeholder="Squadra Casa">
+                            <input type="text" class="team-input" id="m${i}-away" placeholder="Squadra Ospite">
+                        </div>
+                        <div class="api-controls">
+                            <select class="league-sel" id="m${i}-league">
+                                <option value="soccer_italy_serie_a" selected>Serie A</option>
+                                <option value="soccer_italy_serie_b">Serie B</option>
+                                <option value="soccer_epl">Premier League</option>
+                                <option value="soccer_spain_la_liga">La Liga</option>
+                                <option value="soccer_germany_bundesliga">Bundesliga</option>
+                                <option value="soccer_uefa_champs_league">Champions L.</option>
+                            </select>
+                            <button class="btn-api" id="btn-api-${i}" onclick="fetchAPI(${i})">📡 Auto-Compila</button>
+                        </div>
+                    </div>
+
+                    <!-- 1 X 2 -->
+                    <div class="odds-row grid-3">
+                        <div class="odd-box" id="box-${i}-1" onclick="toggleOdd(${i}, '1', '1')">
+                            <div class="odd-lbl">1</div>
+                            <input type="number" class="odd-val" id="val-${i}-1" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-x" onclick="toggleOdd(${i}, 'x', 'X')">
+                            <div class="odd-lbl">X</div>
+                            <input type="number" class="odd-val" id="val-${i}-x" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-2" onclick="toggleOdd(${i}, '2', '2')">
+                            <div class="odd-lbl">2</div>
+                            <input type="number" class="odd-val" id="val-${i}-2" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                    </div>
+
+                    <!-- DOPPIA CHANCE -->
+                    <div class="odds-row grid-3">
+                        <div class="odd-box" id="box-${i}-1x" onclick="toggleOdd(${i}, '1x', '1X')">
+                            <div class="odd-lbl">1X</div>
+                            <input type="number" class="odd-val" id="val-${i}-1x" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-12" onclick="toggleOdd(${i}, '12', '12')">
+                            <div class="odd-lbl">12</div>
+                            <input type="number" class="odd-val" id="val-${i}-12" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-x2" onclick="toggleOdd(${i}, 'x2', 'X2')">
+                            <div class="odd-lbl">X2</div>
+                            <input type="number" class="odd-val" id="val-${i}-x2" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                    </div>
+
+                    <!-- UNDER / OVER -->
+                    <div class="odds-row grid-uo">
+                        <div class="static-lbl">2.5</div>
+                        <div class="odd-box" id="box-${i}-u" onclick="toggleOdd(${i}, 'u', 'UNDER 2.5')">
+                            <div class="odd-lbl">UNDER</div>
+                            <input type="number" class="odd-val" id="val-${i}-u" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-o" onclick="toggleOdd(${i}, 'o', 'OVER 2.5')">
+                            <div class="odd-lbl">OVER</div>
+                            <input type="number" class="odd-val" id="val-${i}-o" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                    </div>
+
+                    <!-- GOL / NO GOL -->
+                    <div class="odds-row grid-2">
+                        <div class="odd-box" id="box-${i}-g" onclick="toggleOdd(${i}, 'g', 'GOL')">
+                            <div class="odd-lbl">G</div>
+                            <input type="number" class="odd-val" id="val-${i}-g" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                        <div class="odd-box" id="box-${i}-ng" onclick="toggleOdd(${i}, 'ng', 'NO GOL')">
+                            <div class="odd-lbl">NG</div>
+                            <input type="number" class="odd-val" id="val-${i}-ng" step="0.01" placeholder="-" onclick="event.stopPropagation()" oninput="calcTotal()">
+                        </div>
+                    </div>
+                </div>`;
+            }
+            container.innerHTML = html;
+            calcTotal();
+        }
+
+        // Seleziona/Deseleziona una quota cliccando sul box
+        function toggleOdd(matchId, marketKey, marketLabel) {
+            // Rimuovi classe selected da tutti i box di questo match
+            const boxes = document.querySelectorAll(`#card-${matchId} .odd-box`);
+            boxes.forEach(b => b.classList.remove('selected'));
+
+            if(matchState[matchId].selectedMarket === marketKey) {
+                // Se era già selezionato, deseleziona
+                matchState[matchId].selectedMarket = null;
+                matchState[matchId].selectedLabel = null;
+            } else {
+                // Altrimenti seleziona il nuovo
+                document.getElementById(`box-${matchId}-${marketKey}`).classList.add('selected');
+                matchState[matchId].selectedMarket = marketKey;
+                matchState[matchId].selectedLabel = marketLabel;
+            }
+            calcTotal();
+        }
+
+        // Calcola il Moltiplicatore Totale in tempo reale
+        function calcTotal() {
+            let total = 1;
+            let count = 0;
+            
+            for(let i=1; i<=5; i++) {
+                let state = matchState[i];
+                if(state && state.selectedMarket) {
+                    let inputVal = document.getElementById(`val-${i}-${state.selectedMarket}`).value;
+                    let num = parseFloat(inputVal);
+                    if(!isNaN(num) && num > 0) {
+                        total *= num;
+                        count++;
+                    }
+                }
+            }
+
+            document.getElementById('tot-count').textContent = count;
+            document.getElementById('tot-mult').textContent = count > 0 ? total.toFixed(2) : "1.00";
+        }
+
+        // CHIAMATA API E CALCOLO MATEMATICO DOPPIE CHANCE
+        async function fetchAPI(id) {
+            let h = document.getElementById(`m${id}-home`).value.trim().toLowerCase();
+            let a = document.getElementById(`m${id}-away`).value.trim().toLowerCase();
+            let lKey = document.getElementById(`m${id}-league`).value;
+            let btn = document.getElementById(`btn-api-${id}`);
+
+            if(!h || !a) { alert("Inserisci le squadre prima di estrapolare le quote."); return; }
+
+            btn.textContent = "⏳ Cerco..."; btn.style.background = "var(--gold-accent)"; btn.style.color = "#000";
+
+            try {
+                const url = `https://api.the-odds-api.com/v4/sports/${lKey}/odds/?apiKey=${API_KEY}&regions=eu&markets=h2h,totals,btts`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("API Error");
+                const data = await response.json();
+                
+                let matchData = null;
+                for (let match of data) {
+                    let apiH = match.home_team.toLowerCase(); let apiA = match.away_team.toLowerCase();
+                    if (apiH.includes(h) || h.includes(apiH) || apiA.includes(a) || a.includes(apiA)) { matchData = match; break; }
+                }
+
+                if (!matchData || !matchData.bookmakers || matchData.bookmakers.length === 0) {
+                    alert("Match non trovato sul database europeo. Inserisci le quote a mano.");
+                    throw new Error("Not found");
+                }
+
+                // Prendiamo il primo bookmaker disponibile per fare la media veloce
+                let bk = matchData.bookmakers[0];
+                let o1 = 0, ox = 0, o2 = 0;
+
+                bk.markets.forEach(mkt => {
+                    if(mkt.key === 'h2h') {
+                        mkt.outcomes.forEach(out => {
+                            let n = out.name.toLowerCase();
+                            if(n === matchData.home_team.toLowerCase()) { document.getElementById(`val-${id}-1`).value = out.price.toFixed(2); o1 = out.price; }
+                            else if(n === 'draw') { document.getElementById(`val-${id}-x`).value = out.price.toFixed(2); ox = out.price; }
+                            else { document.getElementById(`val-${id}-2`).value = out.price.toFixed(2); o2 = out.price; }
+                        });
+                    }
+                    if(mkt.key === 'totals') {
+                        mkt.outcomes.forEach(out => {
+                            if(out.point === 2.5 && out.name.toLowerCase() === 'over') document.getElementById(`val-${id}-o`).value = out.price.toFixed(2);
+                            if(out.point === 2.5 && out.name.toLowerCase() === 'under') document.getElementById(`val-${id}-u`).value = out.price.toFixed(2);
+                        });
+                    }
+                    if(mkt.key === 'btts') {
+                        mkt.outcomes.forEach(out => {
+                            if(out.name.toLowerCase() === 'yes') document.getElementById(`val-${id}-g`).value = out.price.toFixed(2);
+                            if(out.name.toLowerCase() === 'no') document.getElementById(`val-${id}-ng`).value = out.price.toFixed(2);
+                        });
+                    }
+                });
+
+                // MATEMATICA: Calcolo Automatico Doppie Chance partendo da 1X2
+                if(o1 > 0 && ox > 0 && o2 > 0) {
+                    // Formula approssimata DC compensata col margine bookie (moltiplicatore x1.05 per bilanciare l'aggio)
+                    let p1 = 1/o1; let px = 1/ox; let p2 = 1/o2;
+                    let d1x = (1 / (p1 + px)) * 0.95;
+                    let d12 = (1 / (p1 + p2)) * 0.95;
+                    let dx2 = (1 / (px + p2)) * 0.95;
+                    
+                    document.getElementById(`val-${id}-1x`).value = Math.max(1.01, d1x).toFixed(2);
+                    document.getElementById(`val-${id}-12`).value = Math.max(1.01, d12).toFixed(2);
+                    document.getElementById(`val-${id}-x2`).value = Math.max(1.01, dx2).toFixed(2);
+                }
+
+                btn.textContent = "✅ COMPILATO"; btn.style.background = "var(--accent-green)"; btn.style.color = "#fff";
+                calcTotal(); // Aggiorna se c'erano selezioni attive
+
+            } catch (e) {
+                btn.textContent = "⚠️ Fallito"; btn.style.background = "var(--red-value)"; btn.style.color = "#fff";
+            }
+            
+            setTimeout(() => { btn.textContent = "📡 Auto-Compila"; btn.style.background = "var(--accent-blue)"; btn.style.color = "#fff"; }, 3000);
+        }
+
+        // GENERATORE SCHEDINA (MODAL VISIVO)
+        function generateSlip() {
+            let activeCount = parseInt(document.getElementById('tot-count').textContent);
+            if(activeCount === 0) { alert("Seleziona almeno una quota cliccando sui riquadri."); return; }
+
+            const listContainer = document.getElementById('slip-list');
+            let html = '';
+            
+            let d = new Date();
+            let dateStr = d.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('slip-date').textContent = dateStr;
+
+            for(let i=1; i<=5; i++) {
+                let state = matchState[i];
+                if(state && state.selectedMarket) {
+                    let h = document.getElementById(`m${i}-home`).value || `Squadra Casa ${i}`;
+                    let a = document.getElementById(`m${i}-away`).value || `Squadra Ospite ${i}`;
+                    let val = parseFloat(document.getElementById(`val-${i}-${state.selectedMarket}`).value).toFixed(2);
+                    
+                    html += `
+                    <div class="slip-item">
+                        <div>
+                            <span class="slip-match">${h.toUpperCase()} - ${a.toUpperCase()}</span>
+                            <span class="slip-market">Esito: ${state.selectedLabel}</span>
+                        </div>
+                        <div class="slip-odd">${val}</div>
+                    </div>`;
+                }
+            }
+
+            listContainer.innerHTML = html;
+            document.getElementById('slip-final-mult').textContent = `@ ${document.getElementById('tot-mult').textContent}`;
+            document.getElementById('slip-modal').style.display = 'block';
+        }
+
+        function closeSlip() {
+            document.getElementById('slip-modal').style.display = 'none';
+        }
+
+        // Avvio iniziale
+        renderMatches();
+    </script>
+</body>
+</html>
